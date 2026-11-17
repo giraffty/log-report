@@ -35,7 +35,8 @@ Each feature owns everything it needs. There is no `shared` folder:
 - Code used by one feature lives in that feature. When a second feature needs it, it moves to the
   feature it belongs to, and the other imports it from there.
 
-Imports go through `#lib/…` (`#lib/features/call-log/call-log.types`), never `../..`.
+Inside a feature, imports are relative (`./call-log.types`). Across features they go through
+`#lib/…` (`#lib/features/call-log/call-log.types`), never `../..`.
 
 ## Anatomy of a feature
 

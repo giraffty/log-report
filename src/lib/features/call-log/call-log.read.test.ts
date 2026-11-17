@@ -55,8 +55,11 @@ describe("readLog", () => {
           kind: "NotACall",
           lineNumber: 1,
           issues: [
-            { key: "ts", message: expect.any(String) },
-            { key: "tool", message: expect.any(String) },
+            { key: "ts", message: "Invalid ISO datetime" },
+            {
+              key: "tool",
+              message: "Invalid input: expected string, received undefined",
+            },
           ],
         },
       ],
@@ -70,7 +73,12 @@ describe("readLog", () => {
         {
           kind: "NotACall",
           lineNumber: 1,
-          issues: [{ key: "", message: expect.any(String) }],
+          issues: [
+            {
+              key: "",
+              message: "Invalid input: expected object, received number",
+            },
+          ],
         },
       ],
     });
