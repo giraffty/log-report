@@ -8,7 +8,7 @@ export type CallId = {
   readonly seq: number;
 };
 
-export type ChosenConversation =
+type ChosenConversation =
   | { readonly kind: "FIRST" }
   | { readonly kind: "CHOSEN"; readonly number: number };
 
@@ -24,7 +24,7 @@ export type Row = {
   readonly value: string;
 };
 
-export type FlagList =
+type FlagList =
   | { readonly kind: "NONE" }
   | { readonly kind: "FLAGS"; readonly texts: readonly string[] };
 

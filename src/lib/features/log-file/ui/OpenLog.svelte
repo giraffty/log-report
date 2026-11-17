@@ -25,6 +25,12 @@
       onFiles={openFiles}
     />
   {/if}
+  <p class="where">
+    The MCP server writes its log to <code
+      >%LOCALAPPDATA%\Giraffty\logs\mcp-calls.jsonl</code
+    >: type <code>%LOCALAPPDATA%\Giraffty\logs</code> into the file dialog's address
+    bar to get there.
+  </p>
   <p class="privacy">
     The file is read in this browser. Nothing is sent, and nothing is kept when
     you close the page.
@@ -51,9 +57,15 @@
     font-size: var(--ui-font-size-sm);
   }
 
+  .where,
   .privacy {
     margin: 0;
     font-size: var(--ui-font-size-sm);
     color: var(--ui-color-text-secondary);
+  }
+
+  code {
+    font-family: var(--ui-font-mono);
+    color: var(--ui-color-text-primary);
   }
 </style>

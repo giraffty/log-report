@@ -6,7 +6,7 @@
   let { label, items, onSelect }: SelectListProps<T> = $props();
 </script>
 
-<nav class="list" aria-label={label}>
+<nav aria-label={label}>
   <ul class="items">
     {#each items as item (item.value)}
       <li>
