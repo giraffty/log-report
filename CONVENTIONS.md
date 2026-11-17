@@ -52,6 +52,8 @@ Imports go through `#lib/…` (`#lib/features/call-log/call-log.types`), never `
 | `ui/*.svelte`       | Components                               | No logic in markup                     |
 
 A feature has the files it needs: `call-log` is domain only and has no events, reducer or store.
+A domain too large for one file is split by what each part answers: `call-log.read.ts`,
+`call-log.flags.ts`. Values that tests of a feature build go in `x.fixtures.ts`.
 
 Tests sit next to the file they test: `x.reducer.test.ts`.
 
@@ -95,8 +97,11 @@ type LogFileState =
 - Types are `type`, not `interface`, and `readonly`. `exactOptionalPropertyTypes` is on: an
   optional property is either present with a value or absent.
 - Discriminants: a state's is `phase`, an event's is `type`, an error's and a value's is `kind`.
-  `phase`, `type` and modes are `SCREAMING_CASE` (`"FILE_READ"`, `"FAILURES"`); an error `kind` is
-  `PascalCase` (`"NotJson"`).
+  They are `SCREAMING_CASE` (`"FILE_READ"`, `"FIXED_AT"`), and so are modes (`"FAILURES"`); only an
+  error's `kind` is `PascalCase` (`"NotJson"`), so an error reads as one wherever it appears.
+  `@giraffty/ui`'s own types keep theirs (`{ kind: "none" }`).
+- A value with a meaning is data, not text: a flag carries the call it points to
+  (`{ kind: "REPEATED_CALL", seq: 3, sameAs: 2 }`), and the view makes the words.
 
 ## Errors
 
@@ -108,7 +113,7 @@ export type LineProblem =
   | {
       readonly kind: "NotACall";
       readonly lineNumber: number;
-      readonly issues: readonly string[];
+      readonly issues: readonly LineIssue[];
     };
 ```
 
@@ -149,5 +154,5 @@ global an effect uses is visible where it is called.
 - Assert whole outcomes: `expect(result).toEqual(ok(value))`,
   `expect(problems).toEqual([{ kind: "NotJson", lineNumber: 3 }])`.
 - No `_unsafe*` helpers from `neverthrow`.
-- Log lines in tests are built by one helper per feature, with only the keys the test is about
-  spelled out.
+- Log lines in tests are built by the feature's fixtures (`lineAt(3, { tool: "mutate" })`), with
+  only the keys the test is about spelled out.
