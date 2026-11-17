@@ -4,8 +4,14 @@
     closeLog,
     logFile,
   } from "#lib/features/log-file/log-file.store.svelte.ts";
+  import { resetReport } from "#lib/features/report/report.store.svelte.ts";
   import Report from "#lib/features/report/ui/Report.svelte";
   import { keepInPage } from "#lib/shared/ui/file-drop/file-drop.svelte.ts";
+
+  const close = (): void => {
+    resetReport();
+    closeLog();
+  };
 </script>
 
 <svelte:head>
@@ -18,7 +24,7 @@
   <Report
     name={logFile.current.name}
     log={logFile.current.log}
-    onclose={closeLog}
+    onclose={close}
   />
 {:else}
   <OpenLog file={logFile.current} />

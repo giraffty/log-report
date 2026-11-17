@@ -75,10 +75,20 @@ describe("chooseOf", () => {
     input.dispatchEvent(new Event("change"));
 
     expect(onFiles).toHaveBeenCalledWith([file]);
-    expect(input.files?.length).toBe(0);
+    expect(input.files.length).toBe(0);
   });
 
-  it("ignores a change from anything but a file input", () => {
+  it("hands over no files from an input that holds none", () => {
+    const onFiles = vi.fn();
+    const input = document.createElement("input");
+    input.addEventListener("change", chooseOf(onFiles));
+
+    input.dispatchEvent(new Event("change"));
+
+    expect(onFiles).toHaveBeenCalledWith([]);
+  });
+
+  it("ignores a change from anything but an input", () => {
     const onFiles = vi.fn();
     const element = document.createElement("div");
     element.addEventListener("change", chooseOf(onFiles));

@@ -41,7 +41,7 @@
     font-size: var(--ui-font-size-sm);
     color: var(--ui-color-text-secondary);
     background-color: var(--ui-color-bg-surface);
-    border: var(--ui-border-width-thick) dashed var(--ui-color-border-default);
+    border: var(--ui-border-width-thick) dotted var(--ui-color-border-default);
   }
 
   .drop.over {
@@ -52,8 +52,8 @@
 
   .title {
     margin: 0;
-    letter-spacing: var(--ui-tracking-wide);
     text-transform: uppercase;
+    letter-spacing: var(--ui-tracking-wide);
   }
 
   .choose {
@@ -63,8 +63,8 @@
     padding-inline: var(--ui-space-3);
     font-weight: var(--ui-font-weight-bold);
     color: var(--ui-color-text-primary);
-    letter-spacing: var(--ui-tracking-wide);
     text-transform: uppercase;
+    letter-spacing: var(--ui-tracking-wide);
     cursor: pointer;
     border: var(--ui-border-width-thin) solid var(--ui-color-border-strong);
   }
@@ -83,7 +83,7 @@
     inline-size: var(--ui-border-width-thin);
     block-size: var(--ui-border-width-thin);
     overflow: hidden;
-    clip-path: inset(50%);
     white-space: nowrap;
+    clip-path: inset(50%);
   }
 </style>
