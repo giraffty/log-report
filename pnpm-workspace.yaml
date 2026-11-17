@@ -1,0 +1,5 @@
+minimumReleaseAgeExclude:
+  - "@giraffty/*"
+
+allowBuilds:
+  esbuild: true
