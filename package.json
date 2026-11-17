@@ -9,6 +9,9 @@
     "url": "git+https://github.com/giraffty/log-report.git"
   },
   "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",

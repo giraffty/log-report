@@ -25,18 +25,22 @@ src/
     log-file/          choosing and reading the file
     call-log/          the log's lines, outcomes, conversations, flags, metrics
     report/            what is shown: selection, filters, opened calls
+  lib/shared/ui/       components @giraffty/ui does not have yet
 eslint/, stylelint/    the repository's own lint rules, with tests
 ```
 
-Each feature owns everything it needs. There is no `shared` folder:
+Each feature owns everything it needs. Code used by one feature lives in that feature, even if it
+looks reusable.
 
-- Generic UI goes to `@giraffty/ui`, where it is documented and tested on its own. A missing
-  component is added there, not built in a feature.
-- Code used by one feature lives in that feature. When a second feature needs it, it moves to the
-  feature it belongs to, and the other imports it from there.
+Generic UI belongs in `@giraffty/ui`, where it is documented and tested on its own. Getting a
+component there is its own piece of work, so one this page needs and ui does not have yet is
+written in `src/lib/shared/ui/<component>/`, as ui would have it: `X.svelte`, `x.types.ts`, the
+handlers and derived values in `x.ts` or `x.svelte.ts`, tests, ui's tokens only. Nothing from a
+feature goes there, and a component in it does not know the call log. Moving it to ui later is a
+separate step; until then, `shared/ui` is the list of what ui is missing.
 
 Inside a feature, imports are relative (`./call-log.types`). Across features they go through
-`#lib/…` (`#lib/features/call-log/call-log.types`), never `../..`.
+`#lib/…`, with the file's extension (`#lib/features/call-log/call-log.types.ts`), never `../..`.
 
 ## Anatomy of a feature
 
