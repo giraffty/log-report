@@ -7,10 +7,15 @@ import type {
   DescribedBeforeQuerying,
   Flag,
   Outcome,
+  Script,
+  ScriptMetrics,
 } from "#lib/features/call-log/call-log.types.ts";
 
 export const countOf = (count: number, thing: string): string =>
   `${count} ${thing}${count === 1 ? "" : "s"}`;
+
+export const queriesOf = (count: number): string =>
+  count === 1 ? "1 query" : `${count} queries`;
 
 export const kilobytes = (bytes: number): string =>
   `${(bytes / 1024).toFixed(1)} KB`;
@@ -31,6 +36,10 @@ export const outcomeLabel = (outcome: Outcome): string =>
     .with("UNAVAILABLE", () => "unavailable")
     .with("NOT_FOUND", () => "not found")
     .with("WEAK_SEARCH", () => "weak search")
+    .with("SCRIPT_ERROR", () => "script error")
+    .with("QUERY_ERROR", () => "query error")
+    .with("LIMIT", () => "limit")
+    .with("CANCELLED", () => "cancelled")
     .exhaustive();
 
 export const outcomeTone = (outcome: Outcome): TagTone =>
@@ -63,6 +72,11 @@ export const formatFlag = (flag: Flag): string =>
       { kind: "NULL_WITHOUT_ERROR" },
       () => "nullWithoutError: null in data without errors",
     )
+    .with(
+      { kind: "INNER_QUERY_FAILED" },
+      (f) =>
+        `innerQueryFailed: ${f.failed} failed inside and the script went on`,
+    )
     .exhaustive();
 
 export const describedLabel = (described: DescribedBeforeQuerying): string =>
@@ -71,6 +85,22 @@ export const describedLabel = (described: DescribedBeforeQuerying): string =>
     .with("NO", () => "no")
     .with("NO_QUERY", () => "no query")
     .exhaustive();
+
+export const scriptsLabel = (
+  scripts: Extract<ScriptMetrics, { kind: "SCRIPTS" }>,
+): string =>
+  `${scripts.scripts} (${scripts.failed} failed) · ${queriesOf(scripts.innerQueries)} inside (${scripts.failedInnerQueries} failed)`;
+
+export const scriptSummaryOf = (
+  script: Extract<Script, { kind: "SCRIPT" }>,
+): string => {
+  const failed = script.innerCalls.filter(
+    (call) => call.result.kind === "FAILED",
+  ).length;
+  return failed === 0
+    ? `script: ${queriesOf(script.innerCalls.length)}`
+    : `script: ${queriesOf(script.innerCalls.length)}, ${failed} failed`;
+};
 
 const QueryInput = z.object({
   root: z.string(),

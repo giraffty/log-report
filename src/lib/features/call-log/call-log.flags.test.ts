@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { callsOf, lineAt } from "./call-log.fixtures";
+import { callsOf, innerCallAt, lineAt, scriptAt } from "./call-log.fixtures";
 import { flagsOf } from "./call-log.flags";
 
 const INVALID = '{"errors":[{"message":"[GIRAFFTY.SCHEMA] x"}]';
@@ -71,6 +71,47 @@ describe("flagsOf", () => {
       lineAt(1, {
         excerpt: '{"errors":[{"message":"x"}],"data":{"value":null}}',
       }),
+    );
+
+    expect(flagsOf(calls)).toEqual([]);
+  });
+
+  it("flags a failed script and its fix, a repeat of the whole script, and queries that failed inside", () => {
+    const calls = callsOf(
+      scriptAt(1, {}, { isError: true, excerpt: "Syntax error: x" }),
+      scriptAt(
+        2,
+        {
+          scriptHash: "whole",
+          innerCalls: [
+            innerCallAt(1),
+            innerCallAt(2, { result: { kind: "FAILED", error: "x" } }),
+          ],
+        },
+        { inputHash: "cut" },
+      ),
+      scriptAt(3, { scriptHash: "whole" }),
+      scriptAt(4, { scriptHash: "other" }, { inputHash: "cut" }),
+    );
+
+    expect(flagsOf(calls)).toEqual([
+      {
+        kind: "RETRY_AFTER_FAILURE",
+        seq: 1,
+        fix: { kind: "FIXED_AT", seq: 2 },
+      },
+      { kind: "INNER_QUERY_FAILED", seq: 2, failed: 1 },
+      { kind: "REPEATED_CALL", seq: 3, sameAs: 2 },
+    ]);
+  });
+
+  it("takes a script for a query when it counts searches", () => {
+    const search = { tool: "search_schema", excerpt: "Wall (context)" };
+    const calls = callsOf(
+      lineAt(1, search),
+      lineAt(2, search),
+      scriptAt(3),
+      lineAt(4, search),
     );
 
     expect(flagsOf(calls)).toEqual([]);

@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { DataList, DataRow, InlineNotice, Tag } from "@giraffty/ui";
+  import {
+    DataList,
+    DataRow,
+    InlineNotice,
+    SectionHeader,
+    Tag,
+  } from "@giraffty/ui";
   import CodeBlock from "#lib/shared/ui/code-block/CodeBlock.svelte";
   import DisclosureRow from "#lib/shared/ui/disclosure-row/DisclosureRow.svelte";
   import { expandCallOf } from "../report.store.svelte";
@@ -29,10 +35,32 @@
         {/each}
       </ul>
     {/if}
-    <CodeBlock label="Sent" text={call.detail.sent} />
+    <CodeBlock label={call.detail.sentLabel} text={call.detail.sent} />
+    {#if call.detail.sentCut.kind === "text"}
+      <InlineNotice kind="info" size="sm"
+        >{call.detail.sentCut.text}</InlineNotice
+      >
+    {/if}
     <CodeBlock label={call.detail.receivedLabel} text={call.detail.received} />
     {#if call.detail.cut.kind === "text"}
       <InlineNotice kind="info" size="sm">{call.detail.cut.text}</InlineNotice>
+    {/if}
+    {#if call.detail.script.kind === "SCRIPT"}
+      {#if call.detail.script.console.kind === "text"}
+        <CodeBlock label="Console" text={call.detail.script.console.text} />
+      {/if}
+      {#if call.detail.script.innerCalls.kind === "CALLS"}
+        <SectionHeader
+          title={call.detail.script.innerCalls.title}
+          level="h3"
+          size="xs"
+        />
+        <DataList size="xs">
+          {#each call.detail.script.innerCalls.rows as row (row.key)}
+            <DataRow label={row.label} value={row.value} tone={row.tone} />
+          {/each}
+        </DataList>
+      {/if}
     {/if}
     <DataList size="xs">
       {#each call.detail.meta as row (row.label)}

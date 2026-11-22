@@ -28,6 +28,7 @@ describe("analyzeLog", () => {
             totalBytes: 100,
             durationMs: 0,
             describedBeforeQuerying: "NO",
+            scripts: { kind: "NONE" },
           },
         },
       ],

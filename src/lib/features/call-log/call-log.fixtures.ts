@@ -1,4 +1,10 @@
-import type { AnalyzedCall, Calls, LogLine } from "./call-log.types";
+import type {
+  AnalyzedCall,
+  Calls,
+  InnerCall,
+  LogLine,
+  Script,
+} from "./call-log.types";
 import { outcomeOf } from "./call-log.outcomes";
 
 const START = Date.parse("2026-10-20T15:00:00.000Z");
@@ -20,8 +26,45 @@ export const lineAt = (
   responseBytes: 100,
   excerpt: '{"errors":[],"data":{}}',
   truncated: false,
+  client: { kind: "NOT_RECORDED" },
+  script: { kind: "NONE" },
   ...overrides,
 });
+
+type ScriptKeys = Omit<Extract<Script, { kind: "SCRIPT" }>, "kind">;
+
+export const innerCallAt = (
+  seq: number,
+  overrides: Partial<InnerCall> = {},
+): InnerCall => ({
+  seq,
+  inputHash: `inner${String(seq).padStart(7, "0")}`,
+  durationMs: 5,
+  responseBytes: 50,
+  result: { kind: "ANSWERED" },
+  ...overrides,
+});
+
+export const scriptAt = (
+  seq: number,
+  script: Partial<ScriptKeys> = {},
+  overrides: Partial<LogLine> = {},
+): LogLine =>
+  lineAt(seq, {
+    tool: "run_script",
+    input: { code: "return 1;" },
+    excerpt: "1",
+    script: {
+      kind: "SCRIPT",
+      code: "return 1;",
+      scriptHash: `hash${String(seq).padStart(8, "0")}`,
+      innerCalls: [],
+      limit: { kind: "NONE" },
+      console: "",
+      ...script,
+    },
+    ...overrides,
+  });
 
 const analyzed = (line: LogLine): AnalyzedCall => ({
   line,
@@ -50,5 +93,18 @@ export const wireLine = (
     responseBytes: 100,
     excerpt: '{"errors":[],"data":{}}',
     truncated: false,
+    ...overrides,
+  });
+
+export const wireScriptLine = (
+  overrides: Readonly<Record<string, unknown>> = {},
+): string =>
+  wireLine({
+    tool: "run_script",
+    input: { code: "return 1;" },
+    excerpt: "1",
+    scriptHash: "hash00000001",
+    innerCalls: [],
+    console: "",
     ...overrides,
   });

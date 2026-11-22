@@ -26,8 +26,34 @@ const searchOutcome = (excerpt: string): Outcome => {
     : "OK";
 };
 
+const SCRIPT_ERRORS = ["Syntax error", "Run-time error"];
+const QUERY_ERROR = "Query error:";
+const CANCELLED = "The request was cancelled";
+
+const scriptOutcome = (line: LogLine): Outcome =>
+  match<LogLine, Outcome>(line)
+    .with({ isError: false }, () => "OK")
+    .with(
+      { script: { kind: "SCRIPT", limit: { kind: "STOPPED" } } },
+      () => "LIMIT",
+    )
+    .when(
+      (l) => SCRIPT_ERRORS.some((start) => l.excerpt.startsWith(start)),
+      () => "SCRIPT_ERROR",
+    )
+    .when(
+      (l) => l.excerpt.startsWith(QUERY_ERROR),
+      () => "QUERY_ERROR",
+    )
+    .when(
+      (l) => l.excerpt.startsWith(CANCELLED),
+      () => "CANCELLED",
+    )
+    .otherwise(() => "UNAVAILABLE");
+
 export const outcomeOf = (line: LogLine): Outcome =>
   match<LogLine, Outcome>(line)
+    .with({ tool: "run_script" }, scriptOutcome)
     .with({ isError: true, tool: "describe_type" }, () => "NOT_FOUND")
     .with({ isError: true }, () => "UNAVAILABLE")
     .with({ tool: P.union("query", "mutate") }, (l) => queryOutcome(l.excerpt))
@@ -36,6 +62,14 @@ export const outcomeOf = (line: LogLine): Outcome =>
 
 export const isFailed = (outcome: Outcome): boolean =>
   match(outcome)
-    .with("INVALID_QUERY", "UNAVAILABLE", "NOT_FOUND", () => true)
-    .with("OK", "PARTIAL", "WEAK_SEARCH", () => false)
+    .with(
+      "INVALID_QUERY",
+      "UNAVAILABLE",
+      "NOT_FOUND",
+      "SCRIPT_ERROR",
+      "QUERY_ERROR",
+      "LIMIT",
+      () => true,
+    )
+    .with("OK", "PARTIAL", "WEAK_SEARCH", "CANCELLED", () => false)
     .exhaustive();

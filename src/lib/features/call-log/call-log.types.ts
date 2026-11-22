@@ -14,6 +14,41 @@ type McpVersion =
 
 type Server = "RUST" | "TYPESCRIPT";
 
+type Client =
+  | {
+      readonly kind: "RECORDED";
+      readonly name: string;
+      readonly version: string;
+    }
+  | { readonly kind: "NOT_RECORDED" };
+
+type InnerResult =
+  | { readonly kind: "ANSWERED" }
+  | { readonly kind: "FAILED"; readonly error: string };
+
+export type InnerCall = {
+  readonly seq: number;
+  readonly inputHash: string;
+  readonly durationMs: number;
+  readonly responseBytes: number;
+  readonly result: InnerResult;
+};
+
+type ScriptLimit =
+  | { readonly kind: "NONE" }
+  | { readonly kind: "STOPPED"; readonly name: string };
+
+export type Script =
+  | { readonly kind: "NONE" }
+  | {
+      readonly kind: "SCRIPT";
+      readonly code: string;
+      readonly scriptHash: string;
+      readonly innerCalls: readonly InnerCall[];
+      readonly limit: ScriptLimit;
+      readonly console: string;
+    };
+
 export type LogLine = {
   readonly at: number;
   readonly session: string;
@@ -28,6 +63,8 @@ export type LogLine = {
   readonly responseBytes: number;
   readonly excerpt: string;
   readonly truncated: boolean;
+  readonly client: Client;
+  readonly script: Script;
 };
 
 export type ReadLog = {
@@ -41,7 +78,11 @@ export type Outcome =
   | "INVALID_QUERY"
   | "UNAVAILABLE"
   | "NOT_FOUND"
-  | "WEAK_SEARCH";
+  | "WEAK_SEARCH"
+  | "SCRIPT_ERROR"
+  | "QUERY_ERROR"
+  | "LIMIT"
+  | "CANCELLED";
 
 export type AnalyzedCall = {
   readonly line: LogLine;
@@ -82,9 +123,24 @@ export type Flag =
       readonly durationMs: number;
     }
   | { readonly kind: "SEARCH_LOOP"; readonly seq: number }
-  | { readonly kind: "NULL_WITHOUT_ERROR"; readonly seq: number };
+  | { readonly kind: "NULL_WITHOUT_ERROR"; readonly seq: number }
+  | {
+      readonly kind: "INNER_QUERY_FAILED";
+      readonly seq: number;
+      readonly failed: number;
+    };
 
 export type DescribedBeforeQuerying = "YES" | "NO" | "NO_QUERY";
+
+export type ScriptMetrics =
+  | { readonly kind: "NONE" }
+  | {
+      readonly kind: "SCRIPTS";
+      readonly scripts: number;
+      readonly failed: number;
+      readonly innerQueries: number;
+      readonly failedInnerQueries: number;
+    };
 
 export type ConversationMetrics = {
   readonly calls: number;
@@ -94,6 +150,7 @@ export type ConversationMetrics = {
   readonly totalBytes: number;
   readonly durationMs: number;
   readonly describedBeforeQuerying: DescribedBeforeQuerying;
+  readonly scripts: ScriptMetrics;
 };
 
 type ConversationReport = {

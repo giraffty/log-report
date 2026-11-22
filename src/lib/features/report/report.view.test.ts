@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { lineAt } from "#lib/features/call-log/call-log.fixtures.ts";
+import {
+  innerCallAt,
+  lineAt,
+  scriptAt,
+} from "#lib/features/call-log/call-log.fixtures.ts";
 import { logOf } from "./report.fixtures";
 import { INITIAL_REPORT } from "./report.reducer";
 import type { CallView, ReportState } from "./report.types";
@@ -110,6 +114,7 @@ describe("reportViewOf", () => {
           { label: "time", value: "1.0 s" },
           { label: "described before querying", value: "no" },
           { label: "MCP", value: "0.7.1" },
+          { label: "client", value: "not recorded" },
         ],
         calls: [
           {
@@ -154,15 +159,19 @@ describe("reportViewOf", () => {
     expect(failed?.detail).toEqual({
       kind: "OPEN",
       flags: { kind: "FLAGS", texts: ["retryAfterFailure: fixed at #2"] },
+      sentLabel: "Sent",
       sent: '{\n  "root": "document"\n}',
+      sentCut: { kind: "none" },
       receivedLabel: "Received",
       received: JSON.stringify(JSON.parse(INVALID), null, 2),
       cut: { kind: "none" },
+      script: { kind: "NONE" },
       meta: [
         { label: "session", value: "s1" },
         { label: "input hash", value: "hash00000001" },
         { label: "MCP", value: "0.7.1" },
         { label: "server", value: "Rust" },
+        { label: "client", value: "not recorded" },
         { label: "time", value: "2026-10-20T15:00:01.000Z" },
       ],
     });
@@ -187,18 +196,22 @@ describe("reportViewOf", () => {
     expect(call?.detail).toEqual({
       kind: "OPEN",
       flags: { kind: "NONE" },
+      sentLabel: "Sent",
       sent: '{\n  "root": "document"\n}',
+      sentCut: { kind: "none" },
       receivedLabel: "Received (error)",
       received: '{"data":',
       cut: {
         kind: "text",
         text: "Cut off: the log keeps the first 8 characters of 9000 bytes.",
       },
+      script: { kind: "NONE" },
       meta: [
         { label: "session", value: "s1" },
         { label: "input hash", value: "hash00000001" },
         { label: "MCP", value: "not recorded" },
         { label: "server", value: "TypeScript" },
+        { label: "client", value: "not recorded" },
         { label: "time", value: "2026-10-20T15:00:01.000Z" },
       ],
     });
@@ -217,7 +230,7 @@ describe("reportViewOf", () => {
       true,
     ]);
     expect(
-      shown.kind === "CONVERSATION" ? shown.conversation.metrics.at(-1) : [],
+      shown.kind === "CONVERSATION" ? shown.conversation.metrics.at(-2) : [],
     ).toEqual({
       label: "MCP",
       value: "not recorded",
@@ -272,6 +285,134 @@ describe("reportViewOf", () => {
     ).toEqual({
       kind: "NOTHING",
       text: "No calls match the filter.",
+    });
+  });
+
+  it("shows a script conversation with its scripts, client and queries inside", () => {
+    const client = {
+      kind: "RECORDED",
+      name: "claude-ai",
+      version: "1.2.3",
+    } as const;
+    const returned = scriptAt(
+      1,
+      {
+        scriptHash: "whole",
+        innerCalls: [
+          innerCallAt(1),
+          innerCallAt(2, { result: { kind: "FAILED", error: "no field x" } }),
+        ],
+        console: "checked",
+      },
+      { client },
+    );
+    const stopped = scriptAt(
+      2,
+      { limit: { kind: "STOPPED", name: "time" } },
+      { client, isError: true, excerpt: "Limit: the script ran too long" },
+    );
+    const { shown } = reportViewOf(logOf([returned, stopped]), {
+      ...INITIAL_REPORT,
+      opened: [
+        { session: "s1", seq: 1 },
+        { session: "s1", seq: 2 },
+      ],
+    });
+    const conversation =
+      shown.kind === "CONVERSATION" ? shown.conversation : undefined;
+    const [first, second] = conversation?.calls ?? [];
+
+    expect(conversation?.metrics).toEqual([
+      { label: "calls", value: "2" },
+      { label: "queries", value: "0 (0 invalid, 0 partial)" },
+      { label: "scripts", value: "2 (1 failed) · 2 queries inside (1 failed)" },
+      { label: "failed", value: "1" },
+      { label: "flags", value: "2" },
+      { label: "answers", value: "0.2 KB" },
+      { label: "time", value: "1.0 s" },
+      { label: "described before querying", value: "no" },
+      { label: "MCP", value: "0.7.1" },
+      { label: "client", value: "claude-ai 1.2.3" },
+    ]);
+    expect([first?.summary, second?.summary]).toEqual([
+      "script: 2 queries, 1 failed",
+      "script: 0 queries",
+    ]);
+    expect(first?.detail).toEqual({
+      kind: "OPEN",
+      flags: {
+        kind: "FLAGS",
+        texts: ["innerQueryFailed: 1 failed inside and the script went on"],
+      },
+      sentLabel: "Script",
+      sent: "return 1;",
+      sentCut: {
+        kind: "text",
+        text: "Cut off: the log keeps the first 9 characters of the script.",
+      },
+      receivedLabel: "Received",
+      received: "1",
+      cut: { kind: "none" },
+      script: {
+        kind: "SCRIPT",
+        console: { kind: "text", text: "checked" },
+        innerCalls: {
+          kind: "CALLS",
+          title: "2 queries inside",
+          rows: [
+            {
+              key: "1",
+              label: "#1 · 0.0 s · 0.0 KB",
+              value: "ok",
+              tone: "muted",
+            },
+            {
+              key: "2",
+              label: "#2 · 0.0 s · 0.0 KB",
+              value: "no field x",
+              tone: "accent",
+            },
+          ],
+        },
+      },
+      meta: [
+        { label: "session", value: "s1" },
+        { label: "input hash", value: "hash00000001" },
+        { label: "script hash", value: "whole" },
+        { label: "limit", value: "none" },
+        { label: "MCP", value: "0.7.1" },
+        { label: "server", value: "Rust" },
+        { label: "client", value: "claude-ai 1.2.3" },
+        { label: "time", value: "2026-10-20T15:00:01.000Z" },
+      ],
+    });
+    expect(second?.detail).toEqual({
+      kind: "OPEN",
+      flags: {
+        kind: "FLAGS",
+        texts: ["retryAfterFailure: not fixed in this conversation"],
+      },
+      sentLabel: "Script",
+      sent: "return 1;",
+      sentCut: { kind: "none" },
+      receivedLabel: "Received (error)",
+      received: "Limit: the script ran too long",
+      cut: { kind: "none" },
+      script: {
+        kind: "SCRIPT",
+        console: { kind: "none" },
+        innerCalls: { kind: "NONE" },
+      },
+      meta: [
+        { label: "session", value: "s1" },
+        { label: "input hash", value: "hash00000002" },
+        { label: "script hash", value: "hash00000002" },
+        { label: "limit", value: "time" },
+        { label: "MCP", value: "0.7.1" },
+        { label: "server", value: "Rust" },
+        { label: "client", value: "claude-ai 1.2.3" },
+        { label: "time", value: "2026-10-20T15:00:02.000Z" },
+      ],
     });
   });
 });

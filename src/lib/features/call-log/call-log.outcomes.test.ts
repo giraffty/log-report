@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lineAt } from "./call-log.fixtures";
+import { lineAt, scriptAt } from "./call-log.fixtures";
 import { isFailed, outcomeOf } from "./call-log.outcomes";
 import type { Outcome } from "./call-log.types";
 
@@ -54,8 +54,65 @@ describe("outcomeOf", () => {
   });
 });
 
+describe("outcomeOf a script", () => {
+  it.each<
+    [
+      string,
+      Parameters<typeof scriptAt>[1],
+      Parameters<typeof scriptAt>[2],
+      Outcome,
+    ]
+  >([
+    ["a script that returned", {}, {}, "OK"],
+    [
+      "a script that does not parse",
+      {},
+      { isError: true, excerpt: "Syntax error at line 1, column 5: x" },
+      "SCRIPT_ERROR",
+    ],
+    [
+      "a script that threw",
+      {},
+      {
+        isError: true,
+        excerpt: "Run-time error: the script returned nothing.",
+      },
+      "SCRIPT_ERROR",
+    ],
+    [
+      "a script whose query threw",
+      {},
+      { isError: true, excerpt: "Query error: no field x" },
+      "QUERY_ERROR",
+    ],
+    [
+      "a script a limit stopped",
+      { limit: { kind: "STOPPED", name: "time" } },
+      { isError: true, excerpt: "Limit: the script ran for more than 30 s" },
+      "LIMIT",
+    ],
+    [
+      "a script the user cancelled",
+      {},
+      {
+        isError: true,
+        excerpt: "The request was cancelled and the script was stopped.",
+      },
+      "CANCELLED",
+    ],
+    [
+      "a script the engine could not run",
+      {},
+      { isError: true, excerpt: "The script engine could not start: x" },
+      "UNAVAILABLE",
+    ],
+  ])("%s", (_, script, overrides, outcome) => {
+    expect(outcomeOf(scriptAt(1, script, overrides))).toBe(outcome);
+  });
+});
+
 describe("isFailed", () => {
-  it("counts invalid queries, unavailable tools and missing types as failed", () => {
+  it("counts invalid queries, unavailable tools, missing types and failed scripts as failed", () => {
     const outcomes: readonly Outcome[] = [
       "OK",
       "PARTIAL",
@@ -63,11 +120,18 @@ describe("isFailed", () => {
       "UNAVAILABLE",
       "NOT_FOUND",
       "WEAK_SEARCH",
+      "SCRIPT_ERROR",
+      "QUERY_ERROR",
+      "LIMIT",
+      "CANCELLED",
     ];
     expect(outcomes.filter(isFailed)).toEqual([
       "INVALID_QUERY",
       "UNAVAILABLE",
       "NOT_FOUND",
+      "SCRIPT_ERROR",
+      "QUERY_ERROR",
+      "LIMIT",
     ]);
   });
 });

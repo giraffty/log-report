@@ -4,6 +4,7 @@
 
 - [x] Choose or drop the log file, and read it in the browser (`log-file`)
 - [x] Conversations, calls, flags and filters (`report`)
+- [x] run_script lines: the script, the queries inside, console and limit; the client
 - [ ] The user guide, from `docs/LOG_REPORT.md` of giraffty/mcp at 77225ec
 
 ## From the TypeScript report

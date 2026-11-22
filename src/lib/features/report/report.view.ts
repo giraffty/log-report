@@ -4,6 +4,9 @@ import type {
   AnalyzedCall,
   AnalyzedLog,
   Flag,
+  InnerCall,
+  LogLine,
+  Script,
 } from "#lib/features/call-log/call-log.types.ts";
 import { formatLineProblem } from "#lib/features/call-log/call-log.errors.ts";
 import type {
@@ -20,6 +23,9 @@ import {
   outcomeLabel,
   outcomeTone,
   prettyOf,
+  queriesOf,
+  scriptsLabel,
+  scriptSummaryOf,
   seconds,
   summaryOf,
   timeOf,
@@ -27,6 +33,7 @@ import {
 import type {
   CallDetail,
   CallView,
+  InnerCallRow,
   ConversationView,
   FilterMode,
   ModeOption,
@@ -34,6 +41,7 @@ import type {
   ReportState,
   ReportView,
   Row,
+  ScriptDetail,
   ShownView,
 } from "./report.types";
 
@@ -54,11 +62,16 @@ const MODES: readonly { readonly mode: FilterMode; readonly label: string }[] =
 const flagsAt = (flags: readonly Flag[], call: AnalyzedCall): readonly Flag[] =>
   flags.filter((flag) => flag.seq === call.line.seq);
 
+const summaryFor = (line: LogLine): string =>
+  line.script.kind === "SCRIPT"
+    ? scriptSummaryOf(line.script)
+    : summaryOf(line.input);
+
 const searchTextOf = (call: AnalyzedCall): string =>
   [
     call.line.tool,
     outcomeLabel(call.outcome),
-    summaryOf(call.line.input),
+    summaryFor(call.line),
     JSON.stringify(call.line.input),
     call.line.excerpt,
   ]
@@ -120,6 +133,21 @@ const versionsOf = (report: ConversationReport): string => {
   return versions.length === 0 ? "not recorded" : versions.join(", ");
 };
 
+const clientOf = (line: LogLine): string =>
+  line.client.kind === "RECORDED"
+    ? `${line.client.name} ${line.client.version}`
+    : "not recorded";
+
+const clientsOf = (report: ConversationReport): string =>
+  [
+    ...new Set(report.conversation.calls.map((call) => clientOf(call.line))),
+  ].join(", ");
+
+const scriptRowsOf = (report: ConversationReport): readonly Row[] =>
+  report.metrics.scripts.kind === "SCRIPTS"
+    ? [{ label: "scripts", value: scriptsLabel(report.metrics.scripts) }]
+    : [];
+
 const metricsOf = (report: ConversationReport): readonly Row[] => {
   const { metrics } = report;
   return [
@@ -128,6 +156,7 @@ const metricsOf = (report: ConversationReport): readonly Row[] => {
       label: "queries",
       value: `${metrics.queries} (${metrics.invalidQueries} invalid, ${metrics.partialQueries} partial)`,
     },
+    ...scriptRowsOf(report),
     { label: "failed", value: `${failedOf(report.conversation.calls)}` },
     { label: "flags", value: `${report.flags.length}` },
     { label: "answers", value: kilobytes(metrics.totalBytes) },
@@ -137,6 +166,7 @@ const metricsOf = (report: ConversationReport): readonly Row[] => {
       value: describedLabel(metrics.describedBeforeQuerying),
     },
     { label: "MCP", value: versionsOf(report) },
+    { label: "client", value: clientsOf(report) },
   ];
 };
 
@@ -148,35 +178,95 @@ const cutOf = (call: AnalyzedCall): OptionalText =>
       }
     : { kind: "none" };
 
-const detailOf = (call: AnalyzedCall, flags: readonly Flag[]): CallDetail => ({
-  kind: "OPEN",
-  flags:
-    flags.length === 0
-      ? { kind: "NONE" }
-      : { kind: "FLAGS", texts: flags.map(formatFlag) },
-  sent: JSON.stringify(call.line.input, null, 2),
-  receivedLabel: call.line.isError ? "Received (error)" : "Received",
-  received: call.line.truncated
-    ? call.line.excerpt
-    : prettyOf(call.line.excerpt),
-  cut: cutOf(call),
-  meta: [
-    { label: "session", value: call.line.session },
-    { label: "input hash", value: call.line.inputHash },
-    {
-      label: "MCP",
-      value:
-        call.line.mcpVersion.kind === "RECORDED"
-          ? call.line.mcpVersion.version
-          : "not recorded",
-    },
-    {
-      label: "server",
-      value: call.line.server === "RUST" ? "Rust" : "TypeScript",
-    },
-    { label: "time", value: new Date(call.line.at).toISOString() },
-  ],
+type Sent = { readonly label: string; readonly text: string };
+
+const sentOf = (line: LogLine): Sent =>
+  line.script.kind === "SCRIPT"
+    ? { label: "Script", text: line.script.code }
+    : { label: "Sent", text: JSON.stringify(line.input, null, 2) };
+
+const innerRowOf = (call: InnerCall): InnerCallRow => ({
+  key: `${call.seq}`,
+  label: `#${call.seq} · ${seconds(call.durationMs)} · ${kilobytes(call.responseBytes)}`,
+  value: call.result.kind === "FAILED" ? call.result.error : "ok",
+  tone: call.result.kind === "FAILED" ? "accent" : "muted",
 });
+
+const sentCutOf = (line: LogLine): OptionalText =>
+  line.script.kind === "SCRIPT" && line.script.scriptHash !== line.inputHash
+    ? {
+        kind: "text",
+        text: `Cut off: the log keeps the first ${line.script.code.length} characters of the script.`,
+      }
+    : { kind: "none" };
+
+const scriptDetailOf = (script: Script): ScriptDetail =>
+  script.kind === "SCRIPT"
+    ? {
+        kind: "SCRIPT",
+        console:
+          script.console === ""
+            ? { kind: "none" }
+            : { kind: "text", text: script.console },
+        innerCalls:
+          script.innerCalls.length === 0
+            ? { kind: "NONE" }
+            : {
+                kind: "CALLS",
+                title: `${queriesOf(script.innerCalls.length)} inside`,
+                rows: script.innerCalls.map(innerRowOf),
+              },
+      }
+    : { kind: "NONE" };
+
+const scriptMetaOf = (script: Script): readonly Row[] =>
+  script.kind === "SCRIPT"
+    ? [
+        { label: "script hash", value: script.scriptHash },
+        {
+          label: "limit",
+          value: script.limit.kind === "STOPPED" ? script.limit.name : "none",
+        },
+      ]
+    : [];
+
+const detailOf = (call: AnalyzedCall, flags: readonly Flag[]): CallDetail => {
+  const sent = sentOf(call.line);
+  return {
+    kind: "OPEN",
+    flags:
+      flags.length === 0
+        ? { kind: "NONE" }
+        : { kind: "FLAGS", texts: flags.map(formatFlag) },
+    sentLabel: sent.label,
+    sent: sent.text,
+    sentCut: sentCutOf(call.line),
+    receivedLabel: call.line.isError ? "Received (error)" : "Received",
+    received: call.line.truncated
+      ? call.line.excerpt
+      : prettyOf(call.line.excerpt),
+    cut: cutOf(call),
+    script: scriptDetailOf(call.line.script),
+    meta: [
+      { label: "session", value: call.line.session },
+      { label: "input hash", value: call.line.inputHash },
+      ...scriptMetaOf(call.line.script),
+      {
+        label: "MCP",
+        value:
+          call.line.mcpVersion.kind === "RECORDED"
+            ? call.line.mcpVersion.version
+            : "not recorded",
+      },
+      {
+        label: "server",
+        value: call.line.server === "RUST" ? "Rust" : "TypeScript",
+      },
+      { label: "client", value: clientOf(call.line) },
+      { label: "time", value: new Date(call.line.at).toISOString() },
+    ],
+  };
+};
 
 const callViewOf = (
   call: AnalyzedCall,
@@ -198,7 +288,7 @@ const callViewOf = (
     },
     duration: seconds(call.line.durationMs),
     size: kilobytes(call.line.responseBytes),
-    summary: summaryOf(call.line.input),
+    summary: summaryFor(call.line),
     flagMark:
       flags.length > 0
         ? { kind: "text", text: `⚠ ${flags.length}` }

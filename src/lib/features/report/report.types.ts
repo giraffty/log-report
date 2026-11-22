@@ -1,4 +1,9 @@
-import type { ButtonVariant, OptionalText, TagTone } from "@giraffty/ui";
+import type {
+  ButtonVariant,
+  DataRowTone,
+  OptionalText,
+  TagTone,
+} from "@giraffty/ui";
 import type { SelectItem } from "#lib/shared/ui/select-list/select-list.types.ts";
 
 export type FilterMode = "ALL" | "FAILURES" | "FLAGGED";
@@ -28,15 +33,41 @@ type FlagList =
   | { readonly kind: "NONE" }
   | { readonly kind: "FLAGS"; readonly texts: readonly string[] };
 
+export type InnerCallRow = {
+  readonly key: string;
+  readonly label: string;
+  readonly value: string;
+  readonly tone: DataRowTone;
+};
+
+type InnerCallsView =
+  | { readonly kind: "NONE" }
+  | {
+      readonly kind: "CALLS";
+      readonly title: string;
+      readonly rows: readonly InnerCallRow[];
+    };
+
+export type ScriptDetail =
+  | { readonly kind: "NONE" }
+  | {
+      readonly kind: "SCRIPT";
+      readonly console: OptionalText;
+      readonly innerCalls: InnerCallsView;
+    };
+
 export type CallDetail =
   | { readonly kind: "CLOSED" }
   | {
       readonly kind: "OPEN";
       readonly flags: FlagList;
+      readonly sentLabel: string;
       readonly sent: string;
+      readonly sentCut: OptionalText;
       readonly receivedLabel: string;
       readonly received: string;
       readonly cut: OptionalText;
+      readonly script: ScriptDetail;
       readonly meta: readonly Row[];
     };
 
